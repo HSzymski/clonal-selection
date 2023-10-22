@@ -20,6 +20,7 @@ class CLONAX:
                  n_antigens_to_average: int = 5,
                  with_proportion: bool = True):
 
+        # parameters mentioned in the source paper
         self.generations = generations
         self.memory_size = memory_size  # m
         self.remaining_size = max(1, int(self.memory_size * remaining_ratio))  # r
@@ -38,6 +39,7 @@ class CLONAX:
         self._class_0_memory = None
         self._class_1_memory = None
         self.remaining_population = None
+
         self.remaining_population_labels = None
 
     @property
@@ -79,7 +81,7 @@ class CLONAX:
         self.n_features = X_train.shape[1]
 
         # Init population
-        self._init_population(self.n_features)
+        self._init_population()
         print('Population initialized')
 
         for generation_val in range(self.generations):
@@ -165,12 +167,36 @@ class CLONAX:
     def _check_n_best(self,
                       training_data: np.ndarray,
                       population: np.ndarray,
-                      population_labels: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+                      population_labels: np.ndarray,
+                      dist_measure: distance = distance.euclidean) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Calculate distance between training set and generated population using scipy.spatial.distance functions, and
+        sort population by that distance from nearest to farthest, after that return self.n_to_clone nearest.
+
+        Parameters
+        ----------
+        training_data: np.ndarray
+            Training dataset.
+        population: np.ndarray
+            Generated population.
+        population_labels: np.ndarray
+            Generated population labels.
+        dist_measure: distance = distance.euclidean
+            Distance measure from scipy.spatial.distance.
+
+        Returns
+        -------
+        Tuple[np.ndarray, np.ndarray, np.ndarray]
+            The best self.n_to_clone cases from population. The first argument refers to the value of individuals from
+            the population, the second to the value of the distance metric, and the third returns the class of each
+            case.
+        """
         # number of ABc + ABr objects
         n_population_obj = len(population)
 
-        distances = np.array([distance.euclidean(training_data, population[j, :]) for j in range(n_population_obj)])
+        distances = np.array([dist_measure(training_data, population[j, :]) for j in range(n_population_obj)])
 
+        # sort by scores
         population_with_scores = np.c_[population, distances]
         population_with_scores_sorted = population_with_scores[population_with_scores[:, -1].argsort()]
         population_labels_sorted = population_labels[population_with_scores[:, -1].argsort()]
@@ -181,19 +207,59 @@ class CLONAX:
 
     def _check_affinities(self,
                           training_data: np.ndarray,
-                          population: np.ndarray) -> np.ndarray:
+                          population: np.ndarray,
+                          dist_measure: distance = distance.euclidean) -> np.ndarray:
+        """
+        Returns values of the affinities between training_data and population. Affinity is calculated by using
+        scipy.spatial.distance between training data individual and population individual, divided by number of the
+        self.n_features.
+
+        Parameters
+        ----------
+        training_data: np.ndarray
+            Training dataset.
+        population: np.ndarray
+            Generated population.
+        dist_measure: distance = distance.euclidean
+            Distance measure from scipy.spatial.distance.
+
+        Returns
+        -------
+        distances: np.ndarray
+            Distances between training_data and population.
+
+        """
         n_population_obj = len(population)
         n_training_data = len(training_data)
 
         distances = np.zeros((n_training_data, n_population_obj))
         for i in range(n_training_data):
             for j in range(n_population_obj):
-                distances[i, j] = distance.euclidean(training_data[i, :], population[j, :]) / self.n_features
+                distances[i, j] = dist_measure(training_data[i, :], population[j, :]) / self.n_features
         return distances
 
     def _create_clones(self,
                        population: np.ndarray,
                        population_labels: np.ndarray) -> Tuple[np.ndarray, np.ndarray, list]:
+        """
+        Creates new population by clonning existing population individual. The number of clones is defined in such a way
+        that the individual of the population at the first index is cloned self.n_to_clone times, the last one starts
+        not to be cloned, every individual between is cloned round(self.n_to_clone / (i + 1)) times, where i is the
+        index of the individual.
+
+        Parameters
+        ----------
+        population: np.ndarray
+            Generated population.
+        population_labels: np.ndarray
+            Generated population labels.
+
+        Returns
+        -------
+        cloned_population_arr, cloned_labels_arr, rank: Tuple[np.ndarray, np.ndarray, list]
+            Returns an array of the cloned population, the labels of each individual and the cloned positions in a
+            ranking (where the most similar have 1st place, etc.).
+        """
         cloned_population: list[list[int]] = []
         cloned_labels: list[list[int]] = []
         rank: list[int] = []
@@ -209,7 +275,14 @@ class CLONAX:
 
         return cloned_population_arr, cloned_labels_arr, rank
 
-    def _init_population(self, n_cols: int) -> None:
+    def _init_population(self) -> None:
+        """
+        Initiates initial populations for the algorithm. It creates self.remaining_population,
+        self.remaining_population_labels and self.class_0_memory, self.class_1_memory. Parameter self.with_proportion
+        controls whether memory individuals ot the same proportion as those present in the training set are to be
+        created.
+        """
+
         if self.with_proportion:
             class_0_lst: list[list[int]] = []
             class_1_lst: list[list[int]] = []
@@ -220,7 +293,7 @@ class CLONAX:
             n_class_1 = self.memory_size - n_class_0
 
             while n_class_0 > 0 or n_class_1 > 0:
-                obj = np.random.random((1, n_cols))
+                obj = np.random.random((1, self.n_features))
                 # obj /= np.sum(obj, axis=1)
                 obj = obj.tolist()
 
@@ -235,7 +308,7 @@ class CLONAX:
             self.class_0_memory = np.array(class_0_lst)
             self.class_1_memory = np.array(class_1_lst)
 
-        remaining_population = np.random.random((self.remaining_size, n_cols))
+        remaining_population = np.random.random((self.remaining_size, self.n_features))
         scaler = MinMaxScaler()
         remaining_population = scaler.fit_transform(remaining_population)
 
@@ -248,7 +321,20 @@ class CLONAX:
     @staticmethod
     def _classify(X_train: Union[np.ndarray, pd.DataFrame],
                   X_test: Union[np.ndarray, pd.DataFrame],
-                  y_train: Union[np.ndarray, pd.DataFrame]):
+                  y_train: Union[np.ndarray, pd.DataFrame]) -> np.ndarray:
+        """
+        Classify test set individuals based on newly created population using KNN classification algorithm.
+
+        Parameters
+        ----------
+        X_train: Union[np.ndarray, pd.DataFrame]
+        X_test: Union[np.ndarray, pd.DataFrame]
+        y_train: Union[np.ndarray, pd.DataFrame]
+
+        Returns
+        -------
+        y_pred: np.ndarray
+        """
         model = KNeighborsClassifier(n_neighbors=10, weights='distance').fit(X_train, y_train)
         y_pred = model.predict(X_test)
 
@@ -257,6 +343,20 @@ class CLONAX:
     def _mutate(self,
                 clones: np.ndarray,
                 rank: list) -> np.ndarray:
+        """
+        For each individual add random noise based on the position in a ranking where the most similar
+        have 1st place, etc.).
+
+        Parameters
+        ----------
+        clones: np.ndarray
+        rank: list
+
+        Returns
+        -------
+        mutated_clones: np.ndarray
+            Clones population modified by noise.
+        """
         # min_val + ((max_val - min_val) / (n_intervals - 1)) * iteration
         noise_variability = (1 - 1 / 100) / (self.n_to_clone - 1)
         noise_std = np.multiply(rank, noise_variability) + 1/100
@@ -272,6 +372,19 @@ class CLONAX:
                       k_highest_affinity_clones: np.ndarray,
                       k_highest_affinity_clones_labels: np.ndarray,
                       clones_avg_affinities: np.ndarray) -> Tuple[list, list]:
+        """
+        Flags data to save and indexes of elements to remove based on the filtering rules defined in the source paper.
+
+        Parameters
+        ----------
+        k_highest_affinity_clones: np.ndarray
+        k_highest_affinity_clones_labels: np.ndarray
+        clones_avg_affinities: np.ndarray
+
+        Returns
+        -------
+        clone_to_save_flag, idx_training_data_to_remove: Tuple[list, list]
+        """
         affinities = self._check_affinities(self.training_set, k_highest_affinity_clones)
 
         clone_to_save_flag: list[bool] = []
@@ -297,24 +410,56 @@ class CLONAX:
     def _remove_from_training_set(self,
                                   idx_training_data_to_remove: list,
                                   idx_left: list,
-                                  index: int):
+                                  index: int) -> object:
+        """
+        Removes data from self.training_set and self.training_labels and returns indexes of the individuals which left.
+
+        Parameters
+        ----------
+        idx_training_data_to_remove: list
+            Indexes of the individuals to remove from self.training_set and self.training_labels.
+        idx_left: list
+            Indexes left after removal.
+        index: int
+            Index of the object under study.
+        Returns
+        -------
+        idx_left: object
+            Indexes of the individuals not removed from training dataset.
+        """
+        idx_left_ = idx_left.copy()
+
         self.training_set = np.delete(self.training_set, idx_training_data_to_remove, axis=0)
         self.training_labels = np.delete(self.training_labels, idx_training_data_to_remove, axis=0)
 
-        idx_left.remove(index)
-        idx_left = np.array(idx_left)
-        idx_left[idx_left > index] -= 1
+        idx_left_.remove(index)
+        idx_left_ = np.array(idx_left_)
+        idx_left_[idx_left_ > index] -= 1
         for idx_to_remove in idx_training_data_to_remove:
-            if idx_to_remove in idx_left:
-                idx_left = np.delete(idx_left, idx_to_remove)
-            idx_left[idx_left > idx_to_remove] -= 1
-            idx_left = np.unique(idx_left)
-        idx_left = idx_left.tolist()
-        return idx_left
+            if idx_to_remove in idx_left_:
+                idx_left_ = np.delete(idx_left_, idx_to_remove)
+            idx_left_[idx_left_ > idx_to_remove] -= 1
+            idx_left_ = np.unique(idx_left_)
+        idx_left_ = idx_left_.tolist()
+
+        return idx_left_
 
     def _calc_dist(self,
                    training_obj: np.ndarray,
                    objects: np.ndarray) -> np.ndarray:
+        """
+        Calculates distances between training object under study and array of objects.
+
+        Parameters
+        ----------
+        training_obj: np.ndarray
+        objects: np.ndarray
+
+        Returns
+        -------
+        objs_distances_arr: np.ndarray
+
+        """
         n_objs = len(objects)
         objs_distances_arr = np.zeros((n_objs, 1))
 
@@ -327,6 +472,16 @@ class CLONAX:
                        k_highest_affinity_clones: np.ndarray,
                        k_highest_affinity_clones_labels: np.ndarray,
                        training_obj: np.ndarray) -> None:
+        """
+        Modifies self.class_0_memory and self.class_1_memory by assigning the best affinity clone to on of that set if
+        that clone affinity is better than worst memory cell affinity.
+
+        Parameters
+        ----------
+        k_highest_affinity_clones: np.ndarray
+        k_highest_affinity_clones_labels: np.ndarray
+        training_obj: np.ndarray
+        """
         clones_distances = self._calc_dist(training_obj, k_highest_affinity_clones)
 
         idx_clones_sort = clones_distances.argsort(axis=0)
@@ -362,19 +517,30 @@ class CLONAX:
 
     def _update_remaining_population(self,
                                      training_obj: np.ndarray) -> None:
+        """
+        Recreate self.remaining_population by adding newly generated random individuals to some number of existing
+        individuals with the best affinity to individual under study. Then classify them based on whole training dataset
+         to get labels.
+
+        Parameters
+        ----------
+        training_obj: np.ndarray
+        """
         remaining_objs = self.remaining_population
         remaining_objs_distances = self._calc_dist(training_obj, remaining_objs)
 
+        # sort array by distances
         idx_remaining_objs = remaining_objs_distances.argsort(axis=0)
         remaining_objs = np.take_along_axis(remaining_objs, idx_remaining_objs, axis=0)
 
+        # create new individuals using random and scale them
         remaining_new_objs = np.random.random((self.n_replaceable_size, self.n_features))
         scaler = MinMaxScaler()
         remaining_new_objs = scaler.fit_transform(remaining_new_objs)
 
+        # select some number of the highest affinity individuals from current remaining population and a
         n_to_leave = np.min(len(remaining_objs) - self.n_replaceable_size, 0)
         remaining_objs = remaining_objs[:n_to_leave, :]
-
         remaining_population = np.concatenate((remaining_objs, remaining_new_objs))
 
         # Assign class using trained model
@@ -389,11 +555,11 @@ class CLONAX:
 
         Parameters
         ----------
-        X_test : numpy ndarray of the same shape as training dataset
-            Test samples.
+        X_test: np.ndarray
+            Test samples of the same shape as training dataset.
         Returns
         -------
-        y_pred : numpy ndarray
+        y_pred: np.ndarray
             Class labels for each data sample.
         """
 
