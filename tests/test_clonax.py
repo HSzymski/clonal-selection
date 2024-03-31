@@ -3,7 +3,6 @@ import pytest
 import numpy as np
 
 from classifiers.clonax import CLONAX
-from scipy.spatial import distance
 
 
 @pytest.fixture
@@ -61,5 +60,4 @@ class TestCLONAX:
         np.testing.assert_array_equal(cloned_population_arr, cloned_population_arr_res)
         np.testing.assert_array_equal(cloned_labels_arr, cloned_labels_arr_res)
         np.testing.assert_array_equal(rank, rank_res)
-
 
