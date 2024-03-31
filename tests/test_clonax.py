@@ -64,7 +64,7 @@ class TestCLONAX:
                            create_default_obj,
                            f_create_clones_resource_1,
                            f_create_clones_expected_1):
-        clonax_inst = CLONAX()
+        clonax_inst = create_default_obj
         population, population_labels, n_to_clone = f_create_clones_resource_1
         cloned_population_arr, cloned_labels_arr, rank = f_create_clones_expected_1
 
