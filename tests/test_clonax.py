@@ -14,7 +14,7 @@ def create_default_obj():
 
 @pytest.fixture
 def f_create_clones_resource_1():
-    print("setup")
+    print("set up create_clones_resource_1")
 
     population = np.array([[1, 1, 1],
                            [2, 2, 2],
@@ -29,11 +29,12 @@ def f_create_clones_resource_1():
            population_labels,
            n_to_clone)
 
-    print("teardown")
+    print("tear down create_clones_resource_1")
 
 
 @pytest.fixture
 def f_create_clones_expected_1():
+    print("set up create_clones_expected_1")
     cloned_population_arr = np.array([[1, 1, 1],
                                       [1, 1, 1],
                                       [1, 1, 1],
@@ -52,7 +53,7 @@ def f_create_clones_expected_1():
            cloned_labels_arr,
            rank)
 
-    print("teardown")
+    print("tear down create_clones_expected_1")
 
 
 class TestCLONAX:
