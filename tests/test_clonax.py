@@ -13,15 +13,27 @@ def create_default_obj():
 
 
 @pytest.fixture
-def create_clones_resource_1():
+def f_create_clones_resource_1():
     print("setup")
 
-    population = [[1, 1, 1], [2, 2, 2], [3, 3, 3]]
-    population_labels = [[0],
-                         [1],
-                         [0]]
+    population = np.array([[1, 1, 1],
+                           [2, 2, 2],
+                           [3, 3, 3]]
+                          )
+    population_labels = np.array([[0],
+                                  [1],
+                                  [0]]
+                                 )
     n_to_clone = 3
+    yield (population,
+           population_labels,
+           n_to_clone)
 
+    print("teardown")
+
+
+@pytest.fixture
+def f_create_clones_expected_1():
     cloned_population_arr = np.array([[1, 1, 1],
                                       [1, 1, 1],
                                       [1, 1, 1],
@@ -36,10 +48,7 @@ def create_clones_resource_1():
                                   [1],
                                   [0]])
     rank = [0, 0, 0, 1, 1, 2]
-    yield (population,
-           population_labels,
-           n_to_clone,
-           cloned_population_arr,
+    yield (cloned_population_arr,
            cloned_labels_arr,
            rank)
 
@@ -50,10 +59,14 @@ class TestCLONAX:
 
     # @pytest.mark.parametrize('population,population_labels,expected',
     #                          ([[1, 1, 1], [2, 2, 2], [3, 3, 3]], [0, 1, 0,])
-    def _test_create_clones(self, create_default_obj, create_clones_resource_1):
-        clonax_inst = create_default_obj()
-        population, population_labels, n_to_clone, cloned_population_arr, cloned_labels_arr, rank = (
-            create_clones_resource_1())
+    def test_create_clones(self,
+                           create_default_obj,
+                           f_create_clones_resource_1,
+                           f_create_clones_expected_1):
+        clonax_inst = CLONAX()
+        population, population_labels, n_to_clone = f_create_clones_resource_1
+        cloned_population_arr, cloned_labels_arr, rank = f_create_clones_expected_1
+
         cloned_population_arr_res, cloned_labels_arr_res, rank_res = (
             clonax_inst._create_clones(population, population_labels, n_to_clone))
 
