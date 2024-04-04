@@ -1,4 +1,4 @@
-from clonax_classifier import CLONAX
+from classifiers.clonax import CLONAX
 from support_functions import calc_metrics, delete_if_exist
 
 from sklearn.model_selection import StratifiedKFold

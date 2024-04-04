@@ -113,7 +113,8 @@ class CLONAX:
                 # 4. Clone antibodies
                 # Clone population and add Gaussian noise
                 cloned_population, cloned_population_labels, rank = self._create_clones(best_from_population,
-                                                                                        population_labels_sorted)
+                                                                                        population_labels_sorted,
+                                                                                        self.n_to_clone)
 
                 # 5. Affinity maturation
                 cloned_noisy_population = self._mutate(cloned_population, rank)
@@ -238,9 +239,10 @@ class CLONAX:
                 distances[i, j] = dist_measure(training_data[i, :], population[j, :]) / self.n_features
         return distances
 
-    def _create_clones(self,
-                       population: np.ndarray,
-                       population_labels: np.ndarray) -> Tuple[np.ndarray, np.ndarray, list]:
+    @staticmethod
+    def _create_clones(population: np.ndarray,
+                       population_labels: np.ndarray,
+                       n_to_clone: int) -> Tuple[np.ndarray, np.ndarray, list]:
         """
         Creates new population by clonning existing population individual. The number of clones is defined in such a way
         that the individual of the population at the first index is cloned self.n_to_clone times, the last one starts
@@ -264,8 +266,8 @@ class CLONAX:
         cloned_labels: list[list[int]] = []
         rank: list[int] = []
 
-        for i in range(min(len(population), self.n_to_clone)):
-            num_of_copies = round(self.n_to_clone / (i + 1))
+        for i in range(min(len(population), n_to_clone)):
+            num_of_copies = round(n_to_clone / (i + 1))
 
             cloned_population.extend([population[i, :].tolist()] * num_of_copies)
             cloned_labels.extend([population_labels[i].tolist()] * num_of_copies)
@@ -446,7 +448,8 @@ class CLONAX:
 
     def _calc_dist(self,
                    training_obj: np.ndarray,
-                   objects: np.ndarray) -> np.ndarray:
+                   objects: np.ndarray,
+                   dist_measure: distance = distance.euclidean) -> np.ndarray:
         """
         Calculates distances between training object under study and array of objects.
 
@@ -464,7 +467,7 @@ class CLONAX:
         objs_distances_arr = np.zeros((n_objs, 1))
 
         for j in range(n_objs):
-            objs_distances_arr[j, :] = distance.euclidean(training_obj, objects[j, :]) \
+            objs_distances_arr[j, :] = dist_measure(training_obj, objects[j, :]) \
                                        / self.n_features
         return objs_distances_arr
 
